@@ -59,15 +59,36 @@ Czekam na zdjęcie
 const fileInput = document.getElementById("fileInput")
 const canvas = document.getElementById("canvas")
 const ctx = canvas.getContext("2d")
-
 const status = document.getElementById("status")
 const zoomContainer = document.getElementById("zooms")
 
 fileInput.addEventListener("change", handleFile)
 
 function setStatus(text){
-
 status.innerHTML = text
+}
+
+function resizeImage(img){
+
+const maxWidth = 1600
+
+if(img.width <= maxWidth){
+return img
+}
+
+const scale = maxWidth / img.width
+
+const c = document.createElement("canvas")
+c.width = maxWidth
+c.height = img.height * scale
+
+const rctx = c.getContext("2d")
+rctx.drawImage(img,0,0,c.width,c.height)
+
+const resized = new Image()
+resized.src = c.toDataURL()
+
+return resized
 
 }
 
@@ -78,35 +99,37 @@ zoomContainer.innerHTML=""
 const file = e.target.files[0]
 
 if(!file){
-
 setStatus("Brak pliku")
-
 return
-
 }
 
 setStatus("Ładowanie zdjęcia...")
 
 const img = new Image()
-
 img.src = URL.createObjectURL(file)
 
-img.onload = async ()=>{
+img.onload = ()=>{
 
-canvas.width = img.width
-canvas.height = img.height
+const resized = resizeImage(img)
 
-ctx.drawImage(img,0,0)
+resized.onload = ()=>{
 
-setStatus("Skanuję kod kreskowy...")
+canvas.width = resized.width
+canvas.height = resized.height
 
-scan(img)
+ctx.drawImage(resized,0,0)
+
+scan(resized)
+
+}
 
 }
 
 }
 
 async function scan(img){
+
+setStatus("Skanuję kod kreskowy...")
 
 const hints = new Map()
 hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [
@@ -119,9 +142,21 @@ try{
 
 const result = await reader.decodeFromImageElement(img)
 
-setStatus("Znaleziony kod: "+result.text)
+if(!result){
+setStatus("Nie znaleziono kodu")
+return
+}
 
+if(result.text.startsWith("0035")){
+
+setStatus("SSCC wykryty:<br><b>"+result.text+"</b>")
 drawBoundingBox(result)
+
+}else{
+
+setStatus("Wykryto Code128 ale nie SSCC:<br>"+result.text)
+
+}
 
 }catch(err){
 
@@ -135,9 +170,6 @@ function drawBoundingBox(result){
 
 const points = result.resultPoints
 
-ctx.strokeStyle="red"
-ctx.lineWidth=5
-
 const xs = points.map(p=>p.x)
 const ys = points.map(p=>p.y)
 
@@ -149,13 +181,16 @@ const maxY = Math.max(...ys)
 
 const padding = 120
 
-const w = (maxX-minX) + padding
-const h = (maxY-minY) + padding
-
 const x = minX - padding/2
 const y = minY - padding/2
+const w = (maxX-minX)+padding
+const h = (maxY-minY)+padding
+
+ctx.strokeStyle="red"
+ctx.lineWidth=5
 
 ctx.strokeRect(x,y,w,h)
+
 createZoom(x,y,w,h)
 
 }
