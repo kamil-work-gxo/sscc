@@ -7,7 +7,7 @@
 
 <title>SSCC Scanner</title>
 
-<script src="https://unpkg.com/@zxing/browser"></script>
+<script src="https://unpkg.com/@zxing/library"></script>
 
 <style>
 
@@ -28,12 +28,6 @@ background:#eee;
 margin-top:10px;
 }
 
-.zoom{
-width:200px;
-border:3px solid red;
-margin:5px;
-}
-
 </style>
 
 </head>
@@ -50,51 +44,20 @@ Czekam na zdjęcie
 
 <canvas id="canvas"></canvas>
 
-<h3>Debug – wycięte etykiety</h3>
-
-<div id="zooms"></div>
-
 <script>
 
 const fileInput = document.getElementById("fileInput")
 const canvas = document.getElementById("canvas")
 const ctx = canvas.getContext("2d")
 const status = document.getElementById("status")
-const zoomContainer = document.getElementById("zooms")
 
 fileInput.addEventListener("change", handleFile)
 
 function setStatus(text){
-status.innerHTML = text
+status.innerHTML=text
 }
 
-function resizeImage(img){
-
-const maxWidth = 1600
-
-if(img.width <= maxWidth){
-return img
-}
-
-const scale = maxWidth / img.width
-
-const c = document.createElement("canvas")
-c.width = maxWidth
-c.height = img.height * scale
-
-const rctx = c.getContext("2d")
-rctx.drawImage(img,0,0,c.width,c.height)
-
-const resized = new Image()
-resized.src = c.toDataURL()
-
-return resized
-
-}
-
-async function handleFile(e){
-
-zoomContainer.innerHTML=""
+function handleFile(e){
 
 const file = e.target.files[0]
 
@@ -110,51 +73,34 @@ img.src = URL.createObjectURL(file)
 
 img.onload = ()=>{
 
-const resized = resizeImage(img)
+canvas.width = img.width
+canvas.height = img.height
 
-resized.onload = ()=>{
+ctx.drawImage(img,0,0)
 
-canvas.width = resized.width
-canvas.height = resized.height
-
-ctx.drawImage(resized,0,0)
-
-scan(resized)
+scan()
 
 }
 
 }
 
-}
-
-async function scan(img){
+async function scan(){
 
 setStatus("Skanuję kod kreskowy...")
 
-const hints = new Map()
-hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [
-ZXingBrowser.BarcodeFormat.CODE_128
-])
-
-const reader = new ZXingBrowser.BrowserMultiFormatReader(hints)
+const codeReader = new ZXing.BrowserMultiFormatReader()
 
 try{
 
-const result = await reader.decodeFromImageElement(img)
-
-if(!result){
-setStatus("Nie znaleziono kodu")
-return
-}
+const result = await codeReader.decodeFromCanvas(canvas)
 
 if(result.text.startsWith("0035")){
 
 setStatus("SSCC wykryty:<br><b>"+result.text+"</b>")
-drawBoundingBox(result)
 
 }else{
 
-setStatus("Wykryto Code128 ale nie SSCC:<br>"+result.text)
+setStatus("Wykryto kod ale nie SSCC:<br>"+result.text)
 
 }
 
@@ -163,52 +109,6 @@ setStatus("Wykryto Code128 ale nie SSCC:<br>"+result.text)
 setStatus("Nie znaleziono kodu kreskowego")
 
 }
-
-}
-
-function drawBoundingBox(result){
-
-const points = result.resultPoints
-
-const xs = points.map(p=>p.x)
-const ys = points.map(p=>p.y)
-
-const minX = Math.min(...xs)
-const maxX = Math.max(...xs)
-
-const minY = Math.min(...ys)
-const maxY = Math.max(...ys)
-
-const padding = 120
-
-const x = minX - padding/2
-const y = minY - padding/2
-const w = (maxX-minX)+padding
-const h = (maxY-minY)+padding
-
-ctx.strokeStyle="red"
-ctx.lineWidth=5
-
-ctx.strokeRect(x,y,w,h)
-
-createZoom(x,y,w,h)
-
-}
-
-function createZoom(x,y,w,h){
-
-const zoom = document.createElement("canvas")
-
-zoom.width = w
-zoom.height = h
-
-const zctx = zoom.getContext("2d")
-
-zctx.drawImage(canvas,x,y,w,h,0,0,w,h)
-
-zoom.className="zoom"
-
-zoomContainer.appendChild(zoom)
 
 }
 
