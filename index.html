@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>SSCC Multi Scanner</title>
+<title>SSCC Scanner</title>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 
@@ -18,7 +18,7 @@ canvas{max-width:100%;border:1px solid black;margin-top:10px;}
 
 <body>
 
-<h2>SSCC Multi Scanner</h2>
+<h2>SSCC Scanner</h2>
 
 <input type="file" id="fileInput" accept="image/*">
 <div id="status">Czekam na zdjęcie</div>
@@ -47,65 +47,42 @@ function handleFile(e){
   const img = new Image();
   img.src = URL.createObjectURL(file);
   img.onload = ()=>{
-
     // opcjonalne zmniejszenie dużych zdjęć
-    let scale = 1;
     const maxWidth = 1600;
-    if(img.width>maxWidth) scale = maxWidth / img.width;
+    let scale = 1;
+    if(img.width > maxWidth) scale = maxWidth / img.width;
 
     canvas.width = img.width * scale;
     canvas.height = img.height * scale;
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-    scanMultiple(canvas);
+    scanImage(canvas);
   }
 }
 
-async function scanMultiple(cnv){
-  setStatus("Skanowanie kodów...");
+async function scanImage(cnv){
+  setStatus("Skanuję kod kreskowy...");
   const reader = new ZXing.BrowserMultiFormatReader();
-  const results = [];
 
-  // podział obrazu na grid 2x2, 3x3, żeby wykryć wiele kodów
-  const rows = 3;
-  const cols = 3;
-  const w = cnv.width / cols;
-  const h = cnv.height / rows;
-
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = w;
-      tempCanvas.height = h;
-      const tctx = tempCanvas.getContext("2d");
-      tctx.drawImage(cnv,c*w,r*h,w,h,0,0,w,h);
-
-      try{
-        const result = await reader.decodeFromCanvas(tempCanvas);
-        if(result.text.startsWith("0035")){
-          // unikamy duplikatów
-          if(!results.includes(result.text)) results.push(result.text);
-          drawBoundingBox(result,r*w,r*h);
-          createZoom(result,r*w,r*h);
-        }
-      }catch(e){
-        // brak kodu w tym fragmencie, ignorujemy
-      }
+  try{
+    const result = await reader.decodeFromCanvas(cnv);
+    if(result.text.startsWith("0035")){
+      setStatus("SSCC wykryty:<br><b>"+result.text+"</b>");
+      drawBoundingBox(result);
+      createZoom(result);
+    } else {
+      setStatus("Wykryto kod Code128, ale nie SSCC:<br>"+result.text);
     }
-  }
-
-  if(results.length>0){
-    setStatus("Znaleziono SSCC:<br>"+results.join("<br>"));
-  } else {
+  }catch(err){
     setStatus("Nie znaleziono kodu kreskowego");
   }
 }
 
-// rysowanie ramki na canvasie
-function drawBoundingBox(result,offsetX=0,offsetY=0){
+// Rysowanie ramki na canvasie
+function drawBoundingBox(result){
   const points = result.resultPoints;
-  const xs = points.map(p=>p.x+offsetX);
-  const ys = points.map(p=>p.y+offsetY);
+  const xs = points.map(p=>p.x);
+  const ys = points.map(p=>p.y);
 
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
@@ -115,19 +92,19 @@ function drawBoundingBox(result,offsetX=0,offsetY=0){
   const padding = 20;
   const x = minX - padding/2;
   const y = minY - padding/2;
-  const w = (maxX-minX) + padding;
-  const h = (maxY-minY) + padding;
+  const w = (maxX-minX)+padding;
+  const h = (maxY-minY)+padding;
 
   ctx.strokeStyle="red";
   ctx.lineWidth=3;
   ctx.strokeRect(x,y,w,h);
 }
 
-// wycięcie etykiety
-function createZoom(result,offsetX=0,offsetY=0){
+// Wycięcie etykiety
+function createZoom(result){
   const points = result.resultPoints;
-  const xs = points.map(p=>p.x+offsetX);
-  const ys = points.map(p=>p.y+offsetY);
+  const xs = points.map(p=>p.x);
+  const ys = points.map(p=>p.y);
 
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
@@ -137,8 +114,8 @@ function createZoom(result,offsetX=0,offsetY=0){
   const padding = 20;
   const x = minX - padding/2;
   const y = minY - padding/2;
-  const w = (maxX-minX) + padding;
-  const h = (maxY-minY) + padding;
+  const w = (maxX-minX)+padding;
+  const h = (maxY-minY)+padding;
 
   const zoom = document.createElement("canvas");
   zoom.width = w;
