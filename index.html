@@ -108,7 +108,12 @@ scan(img)
 
 async function scan(img){
 
-const reader = new ZXingBrowser.BrowserMultiFormatReader()
+const hints = new Map()
+hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [
+ZXingBrowser.BarcodeFormat.CODE_128
+])
+
+const reader = new ZXingBrowser.BrowserMultiFormatReader(hints)
 
 try{
 
