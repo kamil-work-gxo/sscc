@@ -28,6 +28,23 @@ window.addEventListener("load", () => {
   }
 });
 </script>
+
+<script>
+window.addEventListener("load", () => {
+
+  if(window.ZXingBrowser){
+    document.body.innerHTML += "<p>ZXing OK</p>";
+  } else {
+    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
+  }
+
+});
+</script>
+
+
+
+
+
   
 
   
@@ -134,7 +151,7 @@ async function scan(url){
 
   try{
 
-    const reader = new ZXing.BrowserMultiFormatReader();
+    const reader = new ZXingBrowser.BrowserMultiFormatReader();
 
     log("Reader utworzony");
 
