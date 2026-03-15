@@ -19,7 +19,15 @@ window.onload = () => {
 }
 </script>
 
-
+<script>
+window.addEventListener("load", () => {
+  if (window.ZXing) {
+    document.body.innerHTML += "<p>ZXing OK</p>";
+  } else {
+    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
+  }
+});
+</script>
   
 
   
