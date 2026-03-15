@@ -75,51 +75,23 @@ function handleFile(e){
     log("Obraz załadowany");
 
     // Skalowanie obrazu do max 1600px szerokości
-    const scale = Math.min(1, 1600 / img.width);
+    let scale = 1;
+    if(img.width > 1600) scale = 1600 / img.width;
+
     canvas.width = img.width * scale;
     canvas.height = img.height * scale;
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     log("Obraz narysowany na canvas");
 
-    scan(url);
+    // Wywołanie skanowania po narysowaniu
+    scan(canvas);
   }
   img.src = url;
 }
 
-// Funkcja rysująca ramkę na wykrytym kodzie
-function drawBoundingBox(result){
-  if(result.resultPoints && result.resultPoints.length>=2){
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 2;
-    const x1 = result.resultPoints[0].x;
-    const y1 = result.resultPoints[0].y;
-    const x2 = result.resultPoints[1].x;
-    const y2 = result.resultPoints[1].y;
-    ctx.strokeRect(x1-5,y1-5,x2-x1+10,y2-y1+10);
-  }
-}
-
-// Funkcja tworząca miniaturę (zoom) kodu
-function createZoom(result){
-  if(result.resultPoints && result.resultPoints.length>=2){
-    const x1 = result.resultPoints[0].x;
-    const y1 = result.resultPoints[0].y;
-    const x2 = result.resultPoints[1].x;
-    const y2 = result.resultPoints[1].y;
-    const w = x2-x1+10;
-    const h = y2-y1+10;
-    const imgData = ctx.getImageData(x1-5,y1-5,w,h);
-    const zoomCanvas = document.createElement("canvas");
-    zoomCanvas.width = w;
-    zoomCanvas.height = h;
-    zoomCanvas.className = "zoom";
-    zoomCanvas.getContext("2d").putImageData(imgData,0,0);
-    document.body.appendChild(zoomCanvas);
-  }
-}
-
-// Główna funkcja skanowania
-async function scan(url){
+async function scan(canvas){
   setStatus("Skanuję kod kreskowy...");
   log("Start dekodowania");
 
@@ -127,13 +99,13 @@ async function scan(url){
     const reader = new ZXingBrowser.BrowserMultiFormatReader();
     log("Reader utworzony");
 
-    const result = await reader.decodeFromImageUrl(url);
+    // Tutaj używamy canvas zamiast url, żeby dekoder dostał już narysowany obraz
+    const result = await reader.decodeFromCanvas(canvas);
     log("ZXing zwrócił wynik");
     console.log("ZXing result:", result);
 
     if(result){
       log("Kod: " + result.text);
-
       if(result.text.startsWith("0035")){
         setStatus("SSCC: " + result.text);
       }else{
