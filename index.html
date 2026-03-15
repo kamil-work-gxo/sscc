@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>SSCC Scanner Stable Mobile</title>
+<title>SSCC Scanner Debug</title>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 
@@ -11,124 +11,138 @@
 body{font-family:Arial;padding:10px;}
 canvas{max-width:100%;border:1px solid black;margin-top:10px;}
 #status{padding:10px;background:#eee;margin-top:10px;}
-.zoom{width:150px;border:2px solid red;margin:5px;}
-.label-container{display:flex;flex-wrap:wrap;margin-top:10px;}
+#debug{
+margin-top:10px;
+background:black;
+color:#00ff00;
+padding:10px;
+font-size:12px;
+height:200px;
+overflow:auto;
+}
 </style>
 </head>
 
 <body>
 
-<h2>SSCC Scanner – stabilny na telefon</h2>
+<h2>SSCC Scanner DEBUG</h2>
 
 <input type="file" id="fileInput" accept="image/*">
 <div id="status">Czekam na zdjęcie</div>
 
 <canvas id="canvas"></canvas>
 
-<h3>Wycięte etykiety</h3>
-<div class="label-container" id="zooms"></div>
+<h3>Debug log</h3>
+<div id="debug"></div>
 
 <script>
+
+const debugBox = document.getElementById("debug");
+
+function log(msg){
+  const line = document.createElement("div");
+  line.textContent = msg;
+  debugBox.appendChild(line);
+}
+
+log("Start strony");
+
+if(window.ZXing){
+  log("ZXing załadowany");
+}else{
+  log("BŁĄD: ZXing nie załadowany");
+}
+
 const fileInput = document.getElementById("fileInput");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const status = document.getElementById("status");
-const zoomContainer = document.getElementById("zooms");
 
 fileInput.addEventListener("change", handleFile);
 
-function setStatus(text){ status.innerHTML = text; }
+function setStatus(text){
+  status.innerHTML = text;
+  log("STATUS: " + text);
+}
 
 function handleFile(e){
-  zoomContainer.innerHTML = "";
+
+  log("Wybrano plik");
+
   const file = e.target.files[0];
-  if(!file){ setStatus("Brak pliku"); return; }
+
+  if(!file){
+    log("Brak pliku");
+    return;
+  }
+
+  log("Nazwa: " + file.name);
+  log("Rozmiar: " + file.size);
+
+  const url = URL.createObjectURL(file);
 
   const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.src = url;
 
   img.onload = ()=>{
-    const maxWidth = 1600;
-    let scale = 1;
-    if(img.width > maxWidth) scale = maxWidth / img.width;
 
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    log("Obraz załadowany");
 
-    scanImageUrl(url);
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    ctx.drawImage(img,0,0);
+
+    log("Obraz narysowany na canvas");
+
+    scan(url);
+
   }
+
+  img.src = url;
+
 }
 
-async function scanImageUrl(url){
+async function scan(url){
+
   setStatus("Skanuję kod kreskowy...");
 
-  const reader = new ZXing.BrowserMultiFormatReader();
+  log("Start dekodowania");
 
   try{
+
+    const reader = new ZXing.BrowserMultiFormatReader();
+
+    log("Reader utworzony");
+
     const result = await reader.decodeFromImageUrl(url);
 
-    if(result.text.startsWith("0035")){
-      setStatus("SSCC wykryty:<br><b>"+result.text+"</b>");
-      drawBoundingBox(result);
-      createZoom(result);
-    } else {
-      setStatus("Wykryto kod Code128, ale nie SSCC:<br>"+result.text);
+    log("ZXing zwrócił wynik");
+
+    if(result){
+      log("Kod: " + result.text);
+
+      if(result.text.startsWith("0035")){
+        setStatus("SSCC: " + result.text);
+      }else{
+        setStatus("Kod wykryty ale nie SSCC");
+      }
+
+    }else{
+      setStatus("Brak wyniku");
     }
 
-  }catch(err){
-    setStatus("Nie znaleziono kodu kreskowego");
   }
+  catch(err){
+
+    log("Błąd ZXing:");
+    log(err);
+
+    setStatus("Nie znaleziono kodu");
+
+  }
+
 }
 
-// rysowanie ramki
-function drawBoundingBox(result){
-  const points = result.resultPoints;
-  const xs = points.map(p=>p.x);
-  const ys = points.map(p=>p.y);
-
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  const padding = 20;
-  const x = minX - padding/2;
-  const y = minY - padding/2;
-  const w = (maxX-minX)+padding;
-  const h = (maxY-minY)+padding;
-
-  ctx.strokeStyle="red";
-  ctx.lineWidth=3;
-  ctx.strokeRect(x,y,w,h);
-}
-
-// wycięcie etykiety
-function createZoom(result){
-  const points = result.resultPoints;
-  const xs = points.map(p=>p.x);
-  const ys = points.map(p=>p.y);
-
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  const padding = 20;
-  const x = minX - padding/2;
-  const y = minY - padding/2;
-  const w = (maxX-minX)+padding;
-  const h = (maxY-minY)+padding;
-
-  const zoom = document.createElement("canvas");
-  zoom.width = w;
-  zoom.height = h;
-  const zctx = zoom.getContext("2d");
-  zctx.drawImage(canvas,x,y,w,h,0,0,w,h);
-  zoom.className="zoom";
-  zoomContainer.appendChild(zoom);
-}
 </script>
 
 </body>
