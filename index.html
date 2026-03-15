@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<title>SSCC Multi Scanner</title>
+
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
+
+<style>
+body{font-family:Arial;padding:10px;}
+canvas{max-width:100%;border:1px solid black;margin-top:10px;}
+#status{padding:10px;background:#eee;margin-top:10px;}
+.zoom{width:150px;border:2px solid red;margin:5px;}
+.label-container{display:flex;flex-wrap:wrap;margin-top:10px;}
+</style>
+</head>
+
+<body>
+
+<h2>SSCC Multi Scanner</h2>
+
+<input type="file" id="fileInput" accept="image/*">
+<div id="status">Czekam na zdjęcie</div>
+
+<canvas id="canvas"></canvas>
+
+<h3>Wycięte etykiety</h3>
+<div class="label-container" id="zooms"></div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const status = document.getElementById("status");
+const zoomContainer = document.getElementById("zooms");
+
+fileInput.addEventListener("change", handleFile);
+
+function setStatus(text){ status.innerHTML = text; }
+
+function handleFile(e){
+  zoomContainer.innerHTML = "";
+  const file = e.target.files[0];
+  if(!file){ setStatus("Brak pliku"); return; }
+
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  img.onload = ()=>{
+
+    // opcjonalne zmniejszenie dużych zdjęć
+    let scale = 1;
+    const maxWidth = 1600;
+    if(img.width>maxWidth) scale = maxWidth / img.width;
+
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+    scanMultiple(canvas);
+  }
+}
+
+async function scanMultiple(cnv){
+  setStatus("Skanowanie kodów...");
+  const reader = new ZXing.BrowserMultiFormatReader();
+  const results = [];
+
+  // podział obrazu na grid 2x2, 3x3, żeby wykryć wiele kodów
+  const rows = 3;
+  const cols = 3;
+  const w = cnv.width / cols;
+  const h = cnv.height / rows;
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = w;
+      tempCanvas.height = h;
+      const tctx = tempCanvas.getContext("2d");
+      tctx.drawImage(cnv,c*w,r*h,w,h,0,0,w,h);
+
+      try{
+        const result = await reader.decodeFromCanvas(tempCanvas);
+        if(result.text.startsWith("0035")){
+          // unikamy duplikatów
+          if(!results.includes(result.text)) results.push(result.text);
+          drawBoundingBox(result,r*w,r*h);
+          createZoom(result,r*w,r*h);
+        }
+      }catch(e){
+        // brak kodu w tym fragmencie, ignorujemy
+      }
+    }
+  }
+
+  if(results.length>0){
+    setStatus("Znaleziono SSCC:<br>"+results.join("<br>"));
+  } else {
+    setStatus("Nie znaleziono kodu kreskowego");
+  }
+}
+
+// rysowanie ramki na canvasie
+function drawBoundingBox(result,offsetX=0,offsetY=0){
+  const points = result.resultPoints;
+  const xs = points.map(p=>p.x+offsetX);
+  const ys = points.map(p=>p.y+offsetY);
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const padding = 20;
+  const x = minX - padding/2;
+  const y = minY - padding/2;
+  const w = (maxX-minX) + padding;
+  const h = (maxY-minY) + padding;
+
+  ctx.strokeStyle="red";
+  ctx.lineWidth=3;
+  ctx.strokeRect(x,y,w,h);
+}
+
+// wycięcie etykiety
+function createZoom(result,offsetX=0,offsetY=0){
+  const points = result.resultPoints;
+  const xs = points.map(p=>p.x+offsetX);
+  const ys = points.map(p=>p.y+offsetY);
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const padding = 20;
+  const x = minX - padding/2;
+  const y = minY - padding/2;
+  const w = (maxX-minX) + padding;
+  const h = (maxY-minY) + padding;
+
+  const zoom = document.createElement("canvas");
+  zoom.width = w;
+  zoom.height = h;
+  const zctx = zoom.getContext("2d");
+  zctx.drawImage(canvas,x,y,w,h,0,0,w,h);
+  zoom.className="zoom";
+  zoomContainer.appendChild(zoom);
+}
+</script>
+
+</body>
+</html>
