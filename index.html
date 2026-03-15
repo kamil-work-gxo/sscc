@@ -5,8 +5,19 @@
 <meta charset="UTF-8">
 <title>SSCC Scanner Debug</title>
 
-<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
 
+<script>
+window.onload = () => {
+  if(window.ZXing){
+    document.body.innerHTML += "<p>ZXing OK</p>"
+  }else{
+    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>"
+  }
+}
+</script>
+
+  
 <style>
 body{font-family:Arial;padding:10px;}
 canvas{max-width:100%;border:1px solid black;margin-top:10px;}
