@@ -5,65 +5,17 @@
 <meta charset="UTF-8">
 <title>SSCC Scanner Debug</title>
 
+<script src="zxing.js"></script> <!-- Twój pobrany plik UMD -->
 
-<script src="zxing.js"></script>
-
-
-<script>
-window.onload = () => {
-  if(window.ZXing){
-    document.body.innerHTML += "<p>ZXing OK</p>"
-  }else{
-    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>"
-  }
-}
-</script>
-
-<script>
-window.addEventListener("load", () => {
-  if (window.ZXing) {
-    document.body.innerHTML += "<p>ZXing OK</p>";
-  } else {
-    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
-  }
-});
-</script>
-
-<script>
-window.addEventListener("load", () => {
-
-  if(window.ZXingBrowser){
-    document.body.innerHTML += "<p>ZXing OK</p>";
-  } else {
-    document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
-  }
-
-});
-</script>
-
-
-
-
-
-  
-
-  
 <style>
 body{font-family:Arial;padding:10px;}
 canvas{max-width:100%;border:1px solid black;margin-top:10px;}
 #status{padding:10px;background:#eee;margin-top:10px;}
-#debug{
-margin-top:10px;
-background:black;
-color:#00ff00;
-padding:10px;
-font-size:12px;
-height:200px;
-overflow:auto;
-}
+#debug{margin-top:10px;background:black;color:#00ff00;padding:10px;font-size:12px;height:200px;overflow:auto;}
+.zoom{border:2px solid red;margin-top:5px;}
 </style>
-</head>
 
+</head>
 <body>
 
 <h2>SSCC Scanner DEBUG</h2>
@@ -77,8 +29,11 @@ overflow:auto;
 <div id="debug"></div>
 
 <script>
-
 const debugBox = document.getElementById("debug");
+const fileInput = document.getElementById("fileInput");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const status = document.getElementById("status");
 
 function log(msg){
   const line = document.createElement("div");
@@ -88,16 +43,17 @@ function log(msg){
 
 log("Start strony");
 
-if(window.ZXing){
-  log("ZXing załadowany");
+// Sprawdzenie ZXingBrowser
+if(window.ZXingBrowser){
+  log("ZXingBrowser załadowany OK");
+  document.body.innerHTML += "<p>ZXing OK</p>";
 }else{
-  log("BŁĄD: ZXing nie załadowany");
+  log("BŁĄD: ZXingBrowser nie załadowany");
+  document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
 }
 
-const fileInput = document.getElementById("fileInput");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const status = document.getElementById("status");
+// Wydrukuj dostępne klasy w konsoli
+console.log(window.ZXingBrowser);
 
 fileInput.addEventListener("change", handleFile);
 
@@ -107,57 +63,73 @@ function setStatus(text){
 }
 
 function handleFile(e){
-
   log("Wybrano plik");
-
   const file = e.target.files[0];
+  if(!file){ log("Brak pliku"); return; }
 
-  if(!file){
-    log("Brak pliku");
-    return;
-  }
-
-  log("Nazwa: " + file.name);
-  log("Rozmiar: " + file.size);
-
+  log("Nazwa: " + file.name + " | Rozmiar: " + file.size);
   const url = URL.createObjectURL(file);
 
   const img = new Image();
-
   img.onload = ()=>{
-
     log("Obraz załadowany");
 
-    canvas.width = img.width;
-    canvas.height = img.height;
-
-    ctx.drawImage(img,0,0);
-
+    // Skalowanie obrazu do max 1600px szerokości
+    const scale = Math.min(1, 1600 / img.width);
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
     log("Obraz narysowany na canvas");
 
     scan(url);
-
   }
-
   img.src = url;
-
 }
 
+// Funkcja rysująca ramkę na wykrytym kodzie
+function drawBoundingBox(result){
+  if(result.resultPoints && result.resultPoints.length>=2){
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    const x1 = result.resultPoints[0].x;
+    const y1 = result.resultPoints[0].y;
+    const x2 = result.resultPoints[1].x;
+    const y2 = result.resultPoints[1].y;
+    ctx.strokeRect(x1-5,y1-5,x2-x1+10,y2-y1+10);
+  }
+}
+
+// Funkcja tworząca miniaturę (zoom) kodu
+function createZoom(result){
+  if(result.resultPoints && result.resultPoints.length>=2){
+    const x1 = result.resultPoints[0].x;
+    const y1 = result.resultPoints[0].y;
+    const x2 = result.resultPoints[1].x;
+    const y2 = result.resultPoints[1].y;
+    const w = x2-x1+10;
+    const h = y2-y1+10;
+    const imgData = ctx.getImageData(x1-5,y1-5,w,h);
+    const zoomCanvas = document.createElement("canvas");
+    zoomCanvas.width = w;
+    zoomCanvas.height = h;
+    zoomCanvas.className = "zoom";
+    zoomCanvas.getContext("2d").putImageData(imgData,0,0);
+    document.body.appendChild(zoomCanvas);
+  }
+}
+
+// Główna funkcja skanowania
 async function scan(url){
-
   setStatus("Skanuję kod kreskowy...");
-
   log("Start dekodowania");
 
   try{
-
     const reader = new ZXingBrowser.BrowserMultiFormatReader();
-
     log("Reader utworzony");
 
     const result = await reader.decodeFromImageUrl(url);
-
     log("ZXing zwrócił wynik");
+    console.log("ZXing result:", result);
 
     if(result){
       log("Kod: " + result.text);
@@ -165,23 +137,21 @@ async function scan(url){
       if(result.text.startsWith("0035")){
         setStatus("SSCC: " + result.text);
       }else{
-        setStatus("Kod wykryty ale nie SSCC");
+        setStatus("Kod wykryty ale nie SSCC: " + result.text);
       }
+
+      drawBoundingBox(result);
+      createZoom(result);
 
     }else{
       setStatus("Brak wyniku");
     }
 
-  }
-  catch(err){
-
+  }catch(err){
     log("Błąd ZXing:");
     log(err);
-
     setStatus("Nie znaleziono kodu");
-
   }
-
 }
 
 </script>
