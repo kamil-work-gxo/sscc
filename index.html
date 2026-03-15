@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>SSCC Scanner</title>
+<title>SSCC Scanner Grid</title>
 
 <script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 
@@ -18,7 +18,7 @@ canvas{max-width:100%;border:1px solid black;margin-top:10px;}
 
 <body>
 
-<h2>SSCC Scanner</h2>
+<h2>SSCC Scanner – poziome paski</h2>
 
 <input type="file" id="fileInput" accept="image/*">
 <div id="status">Czekam na zdjęcie</div>
@@ -56,33 +56,50 @@ function handleFile(e){
     canvas.height = img.height * scale;
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
-    scanImage(canvas);
+    scanHorizontalGrid(canvas,4); // dzielimy na 4 poziome paski
   }
 }
 
-async function scanImage(cnv){
+async function scanHorizontalGrid(cnv,rows){
   setStatus("Skanuję kod kreskowy...");
-  const reader = new ZXing.BrowserMultiFormatReader();
 
-  try{
-    const result = await reader.decodeFromCanvas(cnv);
-    if(result.text.startsWith("0035")){
-      setStatus("SSCC wykryty:<br><b>"+result.text+"</b>");
-      drawBoundingBox(result);
-      createZoom(result);
-    } else {
-      setStatus("Wykryto kod Code128, ale nie SSCC:<br>"+result.text);
+  const reader = new ZXing.BrowserMultiFormatReader();
+  const results = [];
+
+  const h = cnv.height / rows;
+  const w = cnv.width;
+
+  for(let r=0;r<rows;r++){
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = w;
+    tempCanvas.height = h;
+    const tctx = tempCanvas.getContext("2d");
+    tctx.drawImage(cnv,0,r*h,w,h,0,0,w,h);
+
+    try{
+      const result = await reader.decodeFromCanvas(tempCanvas);
+      if(result.text.startsWith("0035")){
+        if(!results.includes(result.text)) results.push(result.text);
+        drawBoundingBox(result,0,r*h);
+        createZoom(result,0,r*h);
+      }
+    }catch(e){
+      // brak kodu w tym pasku
     }
-  }catch(err){
+  }
+
+  if(results.length>0){
+    setStatus("Znaleziono SSCC:<br>"+results.join("<br>"));
+  } else {
     setStatus("Nie znaleziono kodu kreskowego");
   }
 }
 
-// Rysowanie ramki na canvasie
-function drawBoundingBox(result){
+// rysowanie ramki na canvasie
+function drawBoundingBox(result,offsetX=0,offsetY=0){
   const points = result.resultPoints;
-  const xs = points.map(p=>p.x);
-  const ys = points.map(p=>p.y);
+  const xs = points.map(p=>p.x+offsetX);
+  const ys = points.map(p=>p.y+offsetY);
 
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
@@ -100,11 +117,11 @@ function drawBoundingBox(result){
   ctx.strokeRect(x,y,w,h);
 }
 
-// Wycięcie etykiety
-function createZoom(result){
+// wycięcie etykiety
+function createZoom(result,offsetX=0,offsetY=0){
   const points = result.resultPoints;
-  const xs = points.map(p=>p.x);
-  const ys = points.map(p=>p.y);
+  const xs = points.map(p=>p.x+offsetX);
+  const ys = points.map(p=>p.y+offsetY);
 
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
