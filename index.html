@@ -147,12 +147,16 @@ const maxX = Math.max(...xs)
 const minY = Math.min(...ys)
 const maxY = Math.max(...ys)
 
-const w = maxX-minX
-const h = maxY-minY
+const padding = 120
 
-ctx.strokeRect(minX,minY,w,h)
+const w = (maxX-minX) + padding
+const h = (maxY-minY) + padding
 
-createZoom(minX,minY,w,h)
+const x = minX - padding/2
+const y = minY - padding/2
+
+ctx.strokeRect(x,y,w,h)
+createZoom(x,y,w,h)
 
 }
 
