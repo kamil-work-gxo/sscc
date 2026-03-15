@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 
-<title>SSCC Scanner</title>
+<title>Barcode test</title>
 
-<script src="https://unpkg.com/@zxing/library"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 
 <style>
 
@@ -16,16 +16,15 @@ font-family:Arial;
 padding:10px;
 }
 
-canvas{
+img{
 max-width:100%;
-border:1px solid black;
 margin-top:10px;
 }
 
 #status{
+margin-top:10px;
 padding:10px;
 background:#eee;
-margin-top:10px;
 }
 
 </style>
@@ -34,75 +33,47 @@ margin-top:10px;
 
 <body>
 
-<h2>SSCC scanner</h2>
+<h2>Test skanera</h2>
 
 <input type="file" id="fileInput" accept="image/*">
 
-<div id="status">
-Czekam na zdjęcie
-</div>
+<div id="status">Czekam na zdjęcie</div>
 
-<canvas id="canvas"></canvas>
+<img id="preview">
 
 <script>
 
-const fileInput = document.getElementById("fileInput")
-const canvas = document.getElementById("canvas")
-const ctx = canvas.getContext("2d")
+const input = document.getElementById("fileInput")
 const status = document.getElementById("status")
+const preview = document.getElementById("preview")
 
-fileInput.addEventListener("change", handleFile)
+input.addEventListener("change", handleFile)
 
 function setStatus(text){
-status.innerHTML=text
+status.innerHTML = text
 }
 
-function handleFile(e){
+async function handleFile(e){
 
 const file = e.target.files[0]
 
 if(!file){
-setStatus("Brak pliku")
 return
 }
 
-setStatus("Ładowanie zdjęcia...")
+const url = URL.createObjectURL(file)
 
-const img = new Image()
-img.src = URL.createObjectURL(file)
+preview.src = url
 
-img.onload = ()=>{
+setStatus("Skanuję...")
 
-canvas.width = img.width
-canvas.height = img.height
-
-ctx.drawImage(img,0,0)
-
-scan()
-
-}
-
-}
-
-async function scan(){
-
-setStatus("Skanuję kod kreskowy...")
-
-const codeReader = new ZXing.BrowserMultiFormatReader()
+const reader = new ZXingBrowser.BrowserMultiFormatReader()
 
 try{
 
-const result = await codeReader.decodeFromCanvas(canvas)
+const result = await reader.decodeFromImageUrl(url)
 
-if(result.text.startsWith("0035")){
-
-setStatus("SSCC wykryty:<br><b>"+result.text+"</b>")
-
-}else{
-
-setStatus("Wykryto kod ale nie SSCC:<br>"+result.text)
-
-}
+setStatus("Znaleziono kod:<br><b>"+result.text+"</b>")
 
 }catch(err){
 
