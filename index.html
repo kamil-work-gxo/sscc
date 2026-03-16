@@ -92,7 +92,7 @@ function handleFile(e){
 
       const reader = new ZXingBrowser.BrowserMultiFormatReader();
 
-      const result = await reader.decodeFromImage(img);
+      const result = await reader.decodeFromImageElement(img);
 
       if(result){
 
