@@ -28,7 +28,15 @@ canvas{max-width:100%;border:1px solid black;margin-top:10px;}
 <h3>Debug log</h3>
 <div id="debug"></div>
 
+
+
+
+
+
 <script>
+
+document.addEventListener("DOMContentLoaded", function(){
+
 const debugBox = document.getElementById("debug");
 const fileInput = document.getElementById("fileInput");
 const canvas = document.getElementById("canvas");
@@ -43,17 +51,11 @@ function log(msg){
 
 log("Start strony");
 
-// Sprawdzenie ZXingBrowser
 if(window.ZXingBrowser){
-  log("ZXingBrowser załadowany OK");
-  document.body.innerHTML += "<p>ZXing OK</p>";
+  log("ZXingBrowser OK");
 }else{
-  log("BŁĄD: ZXingBrowser nie załadowany");
-  document.body.innerHTML += "<p>ZXing NIE DZIAŁA</p>";
+  log("ZXingBrowser NIE DZIAŁA");
 }
-
-// Wydrukuj dostępne klasy w konsoli
-console.log(window.ZXingBrowser);
 
 fileInput.addEventListener("change", handleFile);
 
@@ -63,70 +65,73 @@ function setStatus(text){
 }
 
 function handleFile(e){
-  log("Wybrano plik");
-  const file = e.target.files[0];
-  if(!file){ log("Brak pliku"); return; }
 
-  log("Nazwa: " + file.name + " | Rozmiar: " + file.size);
-  const url = URL.createObjectURL(file);
+  log("EVENT change działa");
+
+  const file = e.target.files[0];
+
+  if(!file){
+    log("Brak pliku");
+    return;
+  }
+
+  setStatus("Wczytuję zdjęcie...");
 
   const img = new Image();
-  img.onload = ()=>{
-    log("Obraz załadowany");
 
-    // Skalowanie obrazu do max 1600px szerokości
-    let scale = 1;
-    if(img.width > 1600) scale = 1600 / img.width;
+  img.onload = async function(){
 
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
+    canvas.width = img.width;
+    canvas.height = img.height;
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    log("Obraz narysowany na canvas");
+    ctx.drawImage(img,0,0);
 
-    // Wywołanie skanowania po narysowaniu
-    scan(canvas);
-  }
-  img.src = url;
-}
+    log("Obraz narysowany");
 
-async function scan(canvas){
-  setStatus("Skanuję kod kreskowy...");
-  log("Start dekodowania");
+    try{
 
-  try{
-    const reader = new ZXingBrowser.BrowserMultiFormatReader();
-    log("Reader utworzony");
+      const reader = new ZXingBrowser.BrowserMultiFormatReader();
 
-    // Tutaj używamy canvas zamiast url, żeby dekoder dostał już narysowany obraz
-    const result = await reader.decodeFromCanvas(canvas);
-    log("ZXing zwrócił wynik");
-    console.log("ZXing result:", result);
+      const result = await reader.decodeFromImage(img);
 
-    if(result){
-      log("Kod: " + result.text);
-      if(result.text.startsWith("0035")){
-        setStatus("SSCC: " + result.text);
+      if(result){
+
+        log("Kod: " + result.text);
+
+        if(result.text.startsWith("0035")){
+          setStatus("SSCC: " + result.text);
+        }else{
+          setStatus("Kod: " + result.text);
+        }
+
       }else{
-        setStatus("Kod wykryty ale nie SSCC: " + result.text);
+        setStatus("Brak wyniku");
       }
 
-      drawBoundingBox(result);
-      createZoom(result);
+    }
+    catch(err){
 
-    }else{
-      setStatus("Brak wyniku");
+      log("Błąd dekodowania");
+      log(err);
+
+      setStatus("Nie znaleziono kodu");
+
     }
 
-  }catch(err){
-    log("Błąd ZXing:");
-    log(err);
-    setStatus("Nie znaleziono kodu");
   }
+
+  img.src = URL.createObjectURL(file);
+
 }
 
+});
+
 </script>
+
+
+
+
+  
 
 </body>
 </html>
