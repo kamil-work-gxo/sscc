@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Inwentaryzacja urządzeń QR</title>
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#cbd5e1;--blue:#2563eb;--green:#15803d;--red:#b91c1c;--amber:#a16207}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{background:#0f172a;color:#fff;padding:18px 16px}header h1{font-size:1.25rem;margin:0 0 4px}header p{margin:0;color:#cbd5e1;font-size:.9rem}
+main{max-width:980px;margin:auto;padding:14px}.grid{display:grid;gap:12px}.stats{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--card);border:1px solid #e2e8f0;border-radius:14px;padding:14px;box-shadow:0 2px 8px #0f172a0d}.stat{text-align:center}.stat b{display:block;font-size:1.65rem}.stat span{font-size:.8rem;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}button,.filebtn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;font-size:.95rem;cursor:pointer;background:#e2e8f0;color:#0f172a}button.primary{background:var(--blue);color:#fff}button.danger{background:#fee2e2;color:var(--red)}button:disabled{opacity:.5;cursor:not-allowed}.filebtn input{display:none}
+#reader{display:none;margin-top:12px}.videoWrap{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3}video{width:100%;height:100%;object-fit:cover}.scanline{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#22c55e;box-shadow:0 0 8px #22c55e}.hint{color:var(--muted);font-size:.86rem;margin:8px 0 0}
+.message{display:none;margin-top:10px;padding:10px;border-radius:9px;font-weight:650}.message.ok{display:block;background:#dcfce7;color:#166534}.message.warn{display:block;background:#fef3c7;color:#92400e}.message.err{display:block;background:#fee2e2;color:#991b1b}
+.toolbar{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.toolbar input,.toolbar select{min-height:42px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:1rem}.toolbar input{flex:1;min-width:180px}
+.tableWrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:.9rem}th{color:#475569;font-size:.8rem}tr.found{background:#f0fdf4}.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.75rem;font-weight:800}.yes{background:#dcfce7;color:#166534}.no{background:#e2e8f0;color:#475569}.empty{text-align:center;color:var(--muted);padding:28px}
+.locationBox{margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px}.locationBox label{display:block;font-size:.8rem;font-weight:800;color:#1e40af;margin-bottom:6px}.locationRow{display:flex;gap:8px;flex-wrap:wrap}.locationRow select,.locationRow input{flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:10px;font-size:1rem}.activeLoc{margin-top:8px;font-weight:800;color:#1e3a8a}.manual{display:flex;gap:8px;margin-top:10px}.manual input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;padding:10px;font-size:1rem}
+@media(max-width:580px){.stats{grid-template-columns:repeat(3,1fr)}.stat b{font-size:1.25rem}th:nth-child(2),td:nth-child(2){display:none}button,.filebtn{flex:1;text-align:center}}
+</style>
+</head>
+<body>
+<header><h1>Inwentaryzacja urządzeń QR</h1><p>Skanuj kod, aby oznaczyć urządzenie jako znalezione</p></header>
+<main class="grid">
+<section class="stats grid">
+ <div class="card stat"><b id="total">0</b><span>wszystkie</span></div>
+ <div class="card stat"><b id="found">0</b><span>znalezione</span></div>
+ <div class="card stat"><b id="left">0</b><span>pozostałe</span></div>
+</section>
+<section class="card">
+ <div class="actions">
+  <button id="scanBtn" class="primary" type="button">Uruchom skaner QR</button>
+  <button id="stopBtn" type="button" disabled>Zatrzymaj</button>
+  <label class="filebtn">Import CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label>
+  <button id="exportBtn" type="button">Eksport CSV</button>
+  <button id="resetBtn" class="danger" type="button">Wyzeruj statusy</button>
+ </div>
+ <div class="locationBox">
+  <label for="locationSelect">Lokalizacja dla zeskanowanego urządzenia</label>
+  <div class="locationRow"><select id="locationSelect"><option value="">-- wybierz lokalizację --</option></select><input id="newLocation" placeholder="Dodaj nową lokalizację"><button id="addLocationBtn" type="button">Dodaj</button></div>
+  <div id="activeLocation" class="activeLoc">Najpierw zeskanuj urządzenie</div>
+  <p class="hint">Po zeskanowaniu urządzenia wybierz jego lokalizację z listy albo zeskanuj kod lokalizacji, np. <b>LOC:MAGAZYN-A-01</b>. Przypisanie dotyczy tylko ostatnio zeskanowanego urządzenia.</p>
+ </div>
+ <div id="reader"><div class="videoWrap"><video id="video" playsinline muted></video><div class="scanline"></div></div><p class="hint">Najpierw zeskanuj kod urządzenia. Następnie zeskanuj kod lokalizacji (LOC:...) albo wybierz lokalizację z listy.</p></div>
+ <div class="manual"><input id="manualCode" placeholder="Wpisz lub wklej numer seryjny"><button id="manualBtn" type="button">Oznacz</button></div>
+ <div id="message" class="message" role="status" aria-live="polite"></div>
+</section>
+<section class="card">
+ <h2 style="font-size:1.05rem;margin:0">Lista urządzeń</h2>
+ <div class="toolbar"><input id="search" placeholder="Szukaj nazwy lub numeru seryjnego"><select id="filter"><option value="all">Wszystkie</option><option value="found">Znalezione</option><option value="missing">Nieznalezione</option></select></div>
+ <div class="tableWrap"><table><thead><tr><th>Nazwa</th><th>Opis / lokalizacja</th><th>Numer seryjny</th><th>Lokalizacja z listy</th><th>Lokalizacja znaleziona</th><th>Status</th><th></th></tr></thead><tbody id="list"></tbody></table></div>
+ <p class="hint">Format CSV: <b>name;description;serial;expected_location</b>. Przykład: Laptop Dell;Biuro 1;SN123456;MAGAZYN-A-01</p>
+</section>
+</main>
+<script>
+(()=>{
+'use strict';
+const KEY='qr_inventory_v1';
+let devices=JSON.parse(localStorage.getItem(KEY)||'[]');
+let locations=JSON.parse(localStorage.getItem(KEY+'_locations')||'[]');
+let pendingDeviceId='';
+let stream=null, detector=null, scanning=false, raf=0, lastCode='', lastTime=0;
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem(KEY,JSON.stringify(devices));localStorage.setItem(KEY+'_locations',JSON.stringify(locations));render()}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function norm(v){return String(v??'').trim().toUpperCase()}
+function msg(text,type='ok'){let m=$('message');m.textContent=text;m.className='message '+type;clearTimeout(m._t);m._t=setTimeout(()=>m.className='message',4500)}
+function render(){
+ const sel=$('locationSelect');sel.innerHTML='<option value="">-- wybierz lokalizację --</option>'+locations.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');sel.value='';const pending=devices.find(d=>d.id===pendingDeviceId);$('activeLocation').textContent=pending?'Oczekuje na lokalizację: '+pending.name+' ('+pending.serial+')':'Najpierw zeskanuj urządzenie';
+ const q=norm($('search').value),f=$('filter').value;
+ const rows=devices.filter(d=>(!q||norm(d.name).includes(q)||norm(d.serial).includes(q)||norm(d.description).includes(q))&&(f==='all'||(f==='found'&&d.found)||(f==='missing'&&!d.found)));
+ $('list').innerHTML=rows.length?rows.map(d=>`<tr class="${d.found?'found':''}"><td>${esc(d.name)}</td><td>${esc(d.description)}</td><td><b>${esc(d.serial)}</b></td><td>${esc(d.expectedLocation||'—')}</td><td><b>${esc(d.foundLocation||'—')}</b></td><td><span class="badge ${d.found?'yes':'no'}">${d.found?'Na stanie':'Nieznalezione'}</span></td><td><button type="button" data-id="${esc(d.id)}">${d.found?'Cofnij':'Oznacz'}</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Brak urządzeń. Zaimportuj plik CSV.</td></tr>';
+ const n=devices.filter(d=>d.found).length;$('total').textContent=devices.length;$('found').textContent=n;$('left').textContent=devices.length-n;
+ document.querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>{let d=devices.find(x=>x.id===b.dataset.id);if(d){d.found=!d.found;d.checkedAt=d.found?new Date().toISOString():'';d.foundLocation='';if(!d.found&&pendingDeviceId===d.id)pendingDeviceId='';save()}}));
+}
+function assignLocation(loc){
+ loc=norm(loc);if(!loc)return msg('Wybierz lub zeskanuj lokalizację.','warn');
+ let d=devices.find(x=>x.id===pendingDeviceId);if(!d)return msg('Najpierw zeskanuj kod urządzenia.','warn');
+ if(!locations.includes(loc))locations.push(loc);
+ d.found=true;d.checkedAt=new Date().toISOString();d.foundLocation=loc;pendingDeviceId='';save();
+ if(navigator.vibrate)navigator.vibrate(120);msg(`Zapisano: ${d.name} (${d.serial}) | Lokalizacja: ${loc}`,'ok');
+}
+function mark(code){
+ code=norm(code);if(!code)return msg('Nie odczytano kodu. Spróbuj ponownie.','warn');
+ if(code.startsWith('LOC:')){let loc=code.slice(4).trim();if(!loc)return msg('Kod lokalizacji jest pusty.','err');return assignLocation(loc)}
+ let d=devices.find(x=>norm(x.serial)===code);
+ if(!d)return msg(`Kod ${code} nie występuje na liście.`,'err');
+ if(d.found)return msg(`${d.name} (${d.serial}) jest już zapisane w lokalizacji: ${d.foundLocation||'brak'}.`,'warn');
+ pendingDeviceId=d.id;render();if(navigator.vibrate)navigator.vibrate([80,50,80]);msg(`Urządzenie: ${d.name} (${d.serial}). Teraz zeskanuj lub wybierz lokalizację.`,'warn');
+}
+async function start(){
+ if(!('BarcodeDetector' in window)){msg('Ta przeglądarka nie obsługuje natywnego skanera QR. Użyj aktualnego Chrome na Androidzie albo pola ręcznego.','err');return}
+ try{
+  const supported=await BarcodeDetector.getSupportedFormats();if(!supported.includes('qr_code'))throw new Error('QR unsupported');
+  detector=new BarcodeDetector({formats:['qr_code']});stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+  $('video').srcObject=stream;await $('video').play();scanning=true;$('reader').style.display='block';$('scanBtn').disabled=true;$('stopBtn').disabled=false;tick();
+ }catch(e){msg(location.protocol!=='https:'&&location.hostname!=='localhost'?'Aparat wymaga strony uruchomionej przez HTTPS.':'Nie udało się uruchomić aparatu. Sprawdź uprawnienia przeglądarki.','err')}
+}
+async function tick(){if(!scanning)return;try{let codes=await detector.detect($('video'));if(codes.length){let now=Date.now(),code=codes[0].rawValue;if(code!==lastCode||now-lastTime>2500){lastCode=code;lastTime=now;mark(code)}}}catch(e){}raf=requestAnimationFrame(tick)}
+function stop(){scanning=false;cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('video').srcObject=null;$('reader').style.display='none';$('scanBtn').disabled=false;$('stopBtn').disabled=true}
+function parseCSV(text){
+ const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());if(!lines.length)return [];
+ const sep=(lines[0].match(/;/g)||[]).length>=(lines[0].match(/,/g)||[]).length?';':',';
+ const cells=line=>{let out=[],cur='',quote=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&line[i+1]==='"'){cur+='"';i++}else if(c==='"')quote=!quote;else if(c===sep&&!quote){out.push(cur.trim());cur=''}else cur+=c}out.push(cur.trim());return out};
+ let start=/serial|numer|seryj/i.test(lines[0])?1:0;return lines.slice(start).map((l,i)=>{let c=cells(l);return{id:crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+i,name:c[0]||'Urządzenie',description:c[1]||'',serial:c[2]||c[1]||c[0],expectedLocation:c[3]||'',foundLocation:'',found:false,checkedAt:''}}).filter(d=>d.serial)
+}
+$('csvFile').addEventListener('change',async e=>{let file=e.target.files[0];if(!file)return;let imported=parseCSV(await file.text());if(!imported.length)return msg('Nie znaleziono poprawnych danych w pliku.','err');if(devices.length&&!confirm('Import zastąpi obecną listę. Kontynuować?'))return;devices=imported;locations=[...new Set(devices.map(d=>d.expectedLocation).filter(Boolean).map(norm))];pendingDeviceId='';save();msg(`Zaimportowano ${devices.length} urządzeń.`)});
+$('exportBtn').addEventListener('click',()=>{let lines=['name;description;serial;expected_location;found_location;status;checked_at',...devices.map(d=>[d.name,d.description,d.serial,d.expectedLocation||'',d.foundLocation||'',d.found?'FOUND':'MISSING',d.checkedAt].map(v=>'"'+String(v||'').replaceAll('"','""')+'"').join(';'))];let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='wynik_inwentaryzacji.csv';a.click();URL.revokeObjectURL(a.href)});
+$('resetBtn').addEventListener('click',()=>{if(confirm('Wyzerować wszystkie oznaczenia?')){devices.forEach(d=>{d.found=false;d.checkedAt='';d.foundLocation=''});pendingDeviceId='';save()}});
+$('locationSelect').addEventListener('change',e=>{if(e.target.value)assignLocation(e.target.value)});
+$('addLocationBtn').addEventListener('click',()=>{let loc=norm($('newLocation').value);if(!loc)return msg('Wpisz nazwę lokalizacji.','warn');if(!locations.includes(loc))locations.push(loc);$('newLocation').value='';save();if(pendingDeviceId)assignLocation(loc);else msg('Dodano lokalizację: '+loc+'. Najpierw zeskanuj urządzenie.','ok')});
+$('newLocation').addEventListener('keydown',e=>{if(e.key==='Enter')$('addLocationBtn').click()});
+$('scanBtn').addEventListener('click',start);$('stopBtn').addEventListener('click',stop);$('manualBtn').addEventListener('click',()=>{mark($('manualCode').value);$('manualCode').value=''});$('manualCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('manualBtn').click()});$('search').addEventListener('input',render);$('filter').addEventListener('change',render);window.addEventListener('pagehide',stop);render();
+})();
+</script>
+</body></html>
